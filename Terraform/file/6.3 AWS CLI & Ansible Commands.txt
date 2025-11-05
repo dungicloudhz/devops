@@ -1,0 +1,51 @@
+- Install Ansible using PIP
+  You can also install Ansible using the Python Package Manager (PIP). First, install the PIP using the following command:
+
+dnf install python3.11-pip -y 
+
+
+- Lưu tất cả các files Terrform và ansible template vao trong một thư mục, sử dụng lệnh: 
+
+ mkdir tf_ansible_deploy
+
+- Download file config cua ansible:
+
+ wget https://raw.githubusercontent.com/phuongluuho/TerraformAnsible/main/ansible.cfg
+
+- Next, install Ansible using the PIP command as shown below:
+
+ pip3.11 install --upgrade pip
+ yum install epel-release
+
+ yum install ansible
+
+ rpm -qa|grep ansible
+
+- Setup AWS CLI: 
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+yum install unzip
+unzip awscliv2.zip
+sudo ./aws/install
+- Kiểm tra việc chúng ta có thành công hay ko trong việc cài đăt AWS CLI và Ansible , sử dụng 2 lệnh sau;
+ aws --version
+ ansible --version
+
+ - Sử dụng Lệnh " aws configure"  để cấu hình thông tin xác thực cho AWS CLI .
+
+    Khi chạy lệnh này, bạn sẽ được yêu cầu nhập các thông tin như Access Key ID, Secret Access Key,
+
+
+- Test xem AWS CLI có thể làm việc và tương tác với các dịch vụ và tài nguyên trong tài khoản AWS của bạn hay ko?
+   sử dụng lệnh: 
+
+  aws ec2 describe-instances 
+
+
+
+
+
+
+
+
+
+
