@@ -96,7 +96,7 @@ spec:
 ```yaml
 apiVersion: apps/v1
 kind: ReplicaSet
-metadata:
+: K8s đảm bảo Pod chạy trên mọi Node phù hợp (có thể dùng nodeSelector, tolerations)metadata:
     name: demo-rs
 spec:
     replicas: 2
@@ -147,7 +147,7 @@ spec:
         targetPort: 80
         nodePort: 30080 # port trên node (30000-32767)
 ```
-**Mẹo**: Tránh dùng NodePort cho production trực tiếp - dùng Ingress hoặc cloud LoadBalancer.
+**Mẹo**: Tránh dùng NodePort cho production trực tiếp - dùng Ingress hoặc cloud : K8s đảm bảo Pod chạy trên mọi Node phù hợp (có thể dùng nodeSelector, tolerations)LoadBalancer.
 
 # 5. Ingress (quản lý HTTP/HTTPS)
 **Yêu cầu**: có Ingress Controller (nginx-ingress, Traefik, etx.).
@@ -182,7 +182,7 @@ spec:
 ```yaml
 apiVersion: v1
 kind: ConfigMap
-metadata:
+: K8s đảm bảo Pod chạy trên mọi Node phù hợp (có thể dùng nodeSelector, tolerations)metadata:
     name: app-config
 data:
     APP_MODE: "production"
@@ -202,7 +202,7 @@ stringData:
 **Sử dụng trong Pod:**
 - **Env từ ConfigMap/Secret**
 ```yaml
-env:
+: K8s đảm bảo Pod chạy trên mọi Node phù hợp (có thể dùng nodeSelector, tolerations)env:
   - name: DB_USER
     valueFrom:
       secretKeyRef:
@@ -240,7 +240,7 @@ spec:
 **Sử dụng trong Pod**:
 ```yaml
 volumes:
-    - name: data
+: K8s đảm bảo Pod chạy trên mọi Node phù hợp (có thể dùng nodeSelector, tolerations)    - name: data
     persistentVolumeClaim:
         claimName: data-pvc
 volumeMounts:
@@ -257,3 +257,218 @@ volumeMounts:
 
 **Mẹo**: Với DB production dùng PVC + StatefulSet (Xem bên dưới).
 # 8. StatefulSet (ứng dụng có trạng thái: DB, Kafka)
+**Khi dùng**: cần persistent indentity (tên, storage) - Ví dụ PostgreSQL, Cassandra
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+    name: db
+spec: 
+    serviceName: "db"
+    replicas: 3
+    selector:
+        matchLabels:
+            app: db
+    template:
+        metadata:
+            labels:
+                app: db
+        spec:
+            containers:
+                - name: postgres
+                image: postgres:14
+                volumeMounts:
+                    - name: data
+                    mountPath: /var/lib/postgresql/data
+    volumeClaimTemplates:
+        - metadata:
+            name: data
+        spec:
+            accessModes: ["ReadWriteOne"]
+            resources:
+                requests:
+                    storage: 10Gi
+```
+**Giải thích**:
+- `serviceName` - headless (không đầu) Service để Pod giao tiếp bằng DNS.
+- `volumeClaimTemplates` - mỗi replica có PVC riêng, lưu trữ bền.
+- Pod tên cố định: `db-0`, `db-1`, `db-2`.
+
+**Mẹo**: StatefulSet update phức tạp hơn Deployment - test kỹ.
+
+# 9. DeamonSet (chạy 1 Pod trên mỗi Node)
+**Khi dùng**: node-level agent (fluentd, node-exporter).
+```yaml
+apiVersion: apps/v1
+kind: DeamonSet
+metadata:
+    name: node-agent
+spec:
+    selector:
+        mathLabels:
+            app: node-agent
+    template:
+        metadata:
+            labels:
+                app: node-agent
+        spec:
+            containers:
+                - name: agent
+                image: my-agent:latest
+```
+**Giải thích**: K8s đảm bảo Pod chạy trên mọi Node phù hợp (có thể dùng nodeSelector, tolerations).
+
+# 10. Job & CronJob (tác vụ tạm thời/ định kỳ)
+**Job (chạy xong kết thúc)**:
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+    name: batch-job
+spec:
+    template:
+        spec:
+            containers:
+                - name: worker
+                image: my-worker:latest
+            restartPolicy: OnFailure
+```
+
+**CronJob (lên lịch)**:
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+    name: daily-job
+spec:
+    schedule: "0 2 * * *"
+    jobTemplate:
+        spec:
+            containers:
+                - name: worker
+                image: my-worker:latest
+            restartPolicy: OnFailure
+```
+
+**Mẹo**: `restartPolicy` phải `OnFailure` hoặc `Never` cho Job.
+
+# 11. Horizontal Pod Autoscaler (HPA)
+**Tự động scale pods theo CPU/memory hoặc custom metrics**.
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+    name: web-hpa
+spec:
+    scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: web-deployment
+    minReplicas: 2
+    maxReplicas: 10
+    metrics:
+        - type: Resource
+        resource:
+            name: cpu
+            target: 
+                type: Utilization
+                averageUtilization: 60
+```
+**Giải thích**: HPA theo dõi metric (CPU/Custom) và điều chỉnh `replicas` trong Deployment.
+**Gotcha**: Cần metrics-server (hoặc Prometheus adapter) để HPA hoạt động.
+
+# 12. RBAC: Role, ClusterRole, **RoleBinding**, ClusterRoleBinding
+**Role (namespace-scoped)**::
+
+```yaml
+apiVerion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: 
+    name: pod-reader
+rules:
+    - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "watch", "list"]
+```
+**RoleBinding**:
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+    name: read-pods
+subject:
+    - kind: User
+    name: alice
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+    kind: Role
+    name: pod-reader
+    apiGroup: rbac.authorization.k8s.io
+```
+**Giải thích**: RBAC kiểm soát ai có quyền làm gì; `ClusterRole`/ `ClusterRoleBinding` scope toàn cluster.
+
+# 13. Service Account (dùng cho Pod khi gọi API)
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+    name: my-sa
+---
+# Gán vào Deployment
+spec:
+    template:
+        spec:
+            serviceAccountName: my-sa
+```
+**Giải thích**: Pod có thể sử dụng identity này khi gọi API server.
+
+# 14. Các trường nâng cao hữu ích và mẹo viết YAML
+**Probes (liveness/ readness/ startup)**
+- `livenessProbe` → restart container nếu không phản hồi.
+- `readnessProbe` → loại khỏi Service nếu chưa sẵn sàng.
+-  `startupProbe` → dùng cho app khởi động chậm.
+
+**Resource (request & limits)**
+- Luôn đặt requests để scheduler phân bổ chúng.
+- Đặt limits để tránh container chiếm hết node.
+
+**Afinity & Tolerations**
+- `nodeSelector`, `nodeAffinity`, `podAffinity`/ `antAffinity` để điều khiển scheduling.
+- `tolerations` để cho phép Pod chạy trên node có taint.
+
+Ví dụ `nodeSelector`:
+```yaml
+spec:
+    nodeSelector:
+        disktype: ssd
+```
+**Init containers**
+- Dùng để chạy job trước khi container chính chạy (ví dụ migrate DB).
+
+**Labels & Selectors**
+- Labels là key/value gắn object. Selector dùng để "bắt" objects theo labels.
+- Giữ consistency: `selector.matchLabels` phải đúng với `template.metadata.labels`.
+
+**Annotations**
+- Thông tin metadata cho tools (ingress, monitoring). Không ảnh hưởng selector.
+
+# 15. Mẫu cấu trúc dự án YAML (suggested)
+Tách file theo resource:
+```csharp
+k8s/
+  base/
+    deployment.yaml
+    service.yaml
+    ingress.yaml
+    configmap.yaml
+    secret.yaml
+  overlays/
+    staging/
+    prod/
+```
+Sử dụng Helm hoặc Kustomize để quản lý biến theo môi trường.
+
+# 16. Checklist trước khi apply lên cluster
+- Kiểm tra `selector` và `template.labels` khớp.
+- Đặt `resources.requests` tối thiểu.
+- Thêm `readinessProbe` để tránh traffic cho pod chưa sẵn sàng
