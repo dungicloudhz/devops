@@ -363,4 +363,25 @@ Trong **Settings > CI/CD > Variables** thêm:
 Đặt `Protected` cho biến dùng trong `main`/`prod` nếu cần.
 
 ## 3. Runner
-- Để build Docker images cần runner với Docker (executor `docker` + service `docker:dind`) hoặc `shell` runner có Docker
+- Để build Docker images cần runner với Docker (executor `docker` + service `docker:dind`) hoặc `shell` runner có Docker Engine.
+- K8s Deploy job cần `kubectl`/`helm` binary: bạn có thể dùng image đã có sẵn hoặc cài vào job.
+
+## 4. Bảo mật (best practices)
+- Dùng **CI/CD variables** (masked & protected) để chứa secrets - KHÔNG commit secrets vào repo.
+- Chỉ cho phép biến protected chạy trên branch `main`/`tags` nếu cần.
+- Sử dụng Service Account ít quyền cho k8s / docker registry.
+
+## 5. Rollback
+- Nếu dùng Docker imges → dễ rollback bằng tag cũ (ví dụ `helm upgrade --set image.tag=<old-tag>`)
+- Nếu deploy file-based (rsync) → lưu bản backup trên server trước khi overwrite (ví dụ `rsync --backup --suffix=.bak`)
+
+## 6. Tips performance
+- Dùng `cache` cho dependencies (`.m2`, `node_modules`, `pip cache`) giúp tăng tốc.
+- Chỉ build/test phần thay đổi nếu repo mono-repo - có thể thêm job logic detect paths.
+
+# Ví dụ nhanh: kịch bản chạy mặc định khi bạn "tất cả"
+- Nếu repo có `package.json` & `Dockerfile` → chạy `build_node`, `docker_build`, `docker_push`.
+- Nếu có `pom.xml` → chạy `build_maven` → artifacts `target/*.jar` → nếu `ENABLE_DOCKER` thì có thể build image chứa JAR và push.
+- Nếu bật `ENABLE_K8S` & `ENABLE_CONFIG` có giá trị → job `k8s_deploy` xuất hiện (manual) để deploy prod.
+- Dev branch `develop` → auto deploy lên dev via `deploy_dev_ssh` (nếu bật SSH).
+- Merge lên `main` → cho phép manual deploy prod & rollback.
