@@ -90,7 +90,7 @@ spec:
 - **Mapping logic**:
     - Deployment tạo và quản lý **ReplicaSet**
     - ReplicaSet tạo và quản lý **Pod**
-    - Khi bạn `kubectl apply` thay ddoori `image: myapp:1.1`, Deployment tạo **ReplicaSet mới** → scale lên Pod mới → scale xuống Pod cũ → **zero-downtime update**
+    - Khi bạn `kubectl apply` thay đổi `image: myapp:1.1`, Deployment tạo **ReplicaSet mới** → scale lên Pod mới → scale xuống Pod cũ → **zero-downtime update**
 
 ## 4. Service - Cổng truy cập cố định cho Pod
 - **Chức năng**:
